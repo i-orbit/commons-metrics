@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 public abstract class AbstractJob implements Job {
 
     public String getCronExpression() {
-        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getCorn();
+        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getCron();
     }
 
     public BigDecimal getFixedTime() {
