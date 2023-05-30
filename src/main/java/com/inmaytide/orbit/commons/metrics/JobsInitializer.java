@@ -106,7 +106,7 @@ public class JobsInitializer implements InitializingBean {
 
     protected Set<Class<?>> getJobClasses() throws IOException {
         if (StringUtils.isBlank(scanPackages)) {
-            LOG.info("The value of the \"application.job-packages\" property is empty, and no scheduled tasks have been initialized");
+            LOG.info("The value of the \"metrics.job-packages\" property is empty, and no scheduled tasks have been initialized");
             return Collections.emptySet();
         }
         List<String> packages = Pattern.compile(",").splitAsStream(scanPackages)
@@ -114,7 +114,7 @@ public class JobsInitializer implements InitializingBean {
                 .distinct()
                 .filter(StringUtils::isNotBlank)
                 .toList();
-        LOG.info("The value of the \"application.job-packages\" property is [{}], there are a total of {} packages that need to be scanned", scanPackages, packages.size());
+        LOG.info("The value of the \"metrics.job-packages\" property is [{}], there are a total of {} packages that need to be scanned", scanPackages, packages.size());
         Set<Class<?>> classes = new HashSet<>();
         for (String packageName : packages) {
             classes.addAll(getJobClasses(packageName));

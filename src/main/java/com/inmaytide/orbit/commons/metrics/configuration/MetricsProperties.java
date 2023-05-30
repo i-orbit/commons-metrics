@@ -129,7 +129,7 @@ public class MetricsProperties {
 
         private String name;
 
-        private String corn;
+        private String cron;
 
         private BigDecimal fixedTime;
 
@@ -145,12 +145,12 @@ public class MetricsProperties {
             this.name = name;
         }
 
-        public String getCorn() {
-            return corn;
+        public String getCron() {
+            return cron;
         }
 
-        public void setCorn(String corn) {
-            this.corn = corn;
+        public void setCron(String cron) {
+            this.cron = cron;
         }
 
         public BigDecimal getFixedTime() {
