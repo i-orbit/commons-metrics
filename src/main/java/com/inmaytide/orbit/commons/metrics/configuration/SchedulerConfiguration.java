@@ -24,7 +24,7 @@ public class SchedulerConfiguration {
         this.properties = properties;
     }
 
-    @Bean(name = "metricsSchedulerFactory")
+    @Bean(name = "schedulerFactory")
     public SchedulerFactoryBean schedulerFactoryBean() throws IOException {
         // 读取 Quartz 配置文件, 并替换数据库列链接相关配置
         PropertiesFactoryBean propertiesFactoryBean = new PropertiesFactoryBean();

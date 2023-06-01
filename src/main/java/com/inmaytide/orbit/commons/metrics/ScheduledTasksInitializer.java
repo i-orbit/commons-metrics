@@ -30,9 +30,9 @@ import java.util.regex.Pattern;
  */
 @Component
 @DependsOn("applicationContextHolder")
-public class JobsInitializer implements InitializingBean {
+public class ScheduledTasksInitializer implements InitializingBean {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JobsInitializer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ScheduledTasksInitializer.class);
 
     private static final String JOB_GROUP = "metrics_jobs_group";
 
@@ -44,7 +44,7 @@ public class JobsInitializer implements InitializingBean {
 
     private final String scanPackages;
 
-    public JobsInitializer(Scheduler scheduler, ResourceLoader resourceLoader, MetricsProperties env) {
+    public ScheduledTasksInitializer(Scheduler scheduler, ResourceLoader resourceLoader, MetricsProperties env) {
         this.scheduler = scheduler;
         this.resourceLoader = resourceLoader;
         this.scanPackages = env.getJobPackages();
@@ -52,55 +52,63 @@ public class JobsInitializer implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        getJobClasses().forEach(this::createJob);
+        getJobClasses().forEach(this::createScheduledTask);
     }
 
-    public void createJob(Class<?> jobClass) {
+    private void deleteScheduledTaskIfExist(TriggerKey triggerKey, JobDetail jobDetail) throws SchedulerException {
+        if (scheduler.checkExists(triggerKey)) {
+            scheduler.deleteJob(jobDetail.getKey());
+        }
+    }
+
+    private JobDetail createJobDetail(AbstractJob job) {
+        return JobBuilder.newJob(job.getClass())
+                .withIdentity(job.getName(), JOB_GROUP)
+                .build();
+    }
+
+    private Trigger createTrigger(AbstractJob job, ScheduleBuilder<?> scheduleBuilder) {
+        return TriggerBuilder.newTrigger()
+                .withIdentity(job.getName(), TRIGGER_GROUP)
+                .withSchedule(scheduleBuilder)
+                .startNow().build();
+    }
+
+    private Optional<ScheduleBuilder<?>> createScheduleBuilder(AbstractJob job) {
+        if (StringUtils.isNotBlank(job.getCronExpression())) {
+            return Optional.of(CronScheduleBuilder.cronSchedule(job.getCronExpression()));
+        } else if (job.getFixedTime() != null) {
+            return Optional.of(SimpleScheduleBuilder.repeatSecondlyForever(job.getFixedTime().intValue()));
+        }
+        return Optional.empty();
+    }
+
+    public void createScheduledTask(Class<?> jobClass) {
         try {
             AbstractJob job = (AbstractJob) jobClass.getDeclaredConstructor().newInstance();
             TriggerKey triggerKey = TriggerKey.triggerKey(job.getName(), TRIGGER_GROUP);
+            JobDetail jobDetail = createJobDetail(job);
             if (!job.getActivated()) {
-                if (scheduler.checkExists(triggerKey)) {
-                    JobDetail jobDetail = JobBuilder.newJob(job.getClass())
-                            .withIdentity(job.getName(), JOB_GROUP)
-                            .build();
-                    scheduler.deleteJob(jobDetail.getKey());
-                }
+                LOG.warn("The scheduled task named \"{}[{}]\" is not active. Initialization is canceled, and any existing execution plans are cleared", job.getName(), jobClass.getName());
+                deleteScheduledTaskIfExist(triggerKey, jobDetail);
                 return;
             }
             if (!scheduler.checkExists(triggerKey)) {
-                JobDetail jobDetail = JobBuilder.newJob(job.getClass())
-                        .withIdentity(job.getName(), JOB_GROUP)
-                        .build();
-                Trigger trigger = null;
-                if (StringUtils.isNotBlank(job.getCronExpression())) {
-                    CronScheduleBuilder scheduleBuilder = CronScheduleBuilder.cronSchedule(job.getCronExpression());
-                    trigger = TriggerBuilder.newTrigger()
-                            .withIdentity(job.getName(), TRIGGER_GROUP)
-                            .withSchedule(scheduleBuilder)
-                            .startNow().build();
-                } else if (job.getFixedTime() != null) {
-                    SimpleScheduleBuilder scheduleBuilder = SimpleScheduleBuilder.repeatSecondlyForever(job.getFixedTime().intValue());
-                    trigger = TriggerBuilder.newTrigger()
-                            .withIdentity(job.getName(), TRIGGER_GROUP)
-                            .withSchedule(scheduleBuilder)
-                            .startNow().build();
+                Optional<ScheduleBuilder<?>> builder = createScheduleBuilder(job);
+                if (builder.isEmpty()) {
+                    LOG.error("The scheduled task named \"{}[{}]\" failed to initialize. \"cron\" and \"fixed-time\" were not configured with valid values", job.getName(), jobClass.getName());
+                    return;
                 }
-                if (trigger != null) {
-                    scheduler.scheduleJob(jobDetail, trigger);
-                    LOG.info("定时任务 \"{}[{}]\" 初始化成功", job.getName(), jobClass.getName());
-                } else {
-                    LOG.error("定时任务 \"{}[{}]\" 初始化失败, \"cron\" 和 \"fixed-time\"未配置有效值", job.getName(), jobClass.getName());
-                }
+                scheduler.scheduleJob(jobDetail, createTrigger(job, builder.get()));
+                LOG.info("The scheduled task named \"{}[{}]\" was initialized successfully", job.getName(), jobClass.getName());
             } else {
-                LOG.info("定时任务 \"{}[{}]\" 已存在", job.getName(), jobClass.getName());
+                LOG.info("The scheduled task named \"{}[{}]\" already exists", job.getName(), jobClass.getName());
             }
-            // 启动是否立即触发一次
             if (job.fireImmediatelyWhenServiceStartup()) {
                 scheduler.triggerJob(scheduler.getTrigger(triggerKey).getJobKey());
             }
         } catch (Exception e) {
-            LOG.error("定时任务 [{}] 初始化失败, Cause by: ", jobClass.getName(), e);
+            LOG.error("The scheduled task \"{}\" failed to initialize, Cause by: ", jobClass.getName(), e);
         }
     }
 
@@ -124,12 +132,12 @@ public class JobsInitializer implements InitializingBean {
     }
 
     protected List<Class<?>> getJobClasses(String packageName) throws IOException {
-        LOG.debug("开始扫描 [{}] 包下的 Class", packageName);
+        LOG.debug("Start scanning class files under the \"{}\" package", packageName);
         List<Class<?>> classes = new ArrayList<>();
         ResourcePatternResolver resolver = ResourcePatternUtils.getResourcePatternResolver(resourceLoader);
         MetadataReaderFactory metadataReaderFactory = new CachingMetadataReaderFactory();
         Resource[] resources = resolver.getResources("classpath*:" + packageName.replaceAll("[.]", "/") + "/**/*.class");
-        LOG.debug("在 [{}] 包下共找到 [{}] 个 Class 文件", packageName, resources.length);
+        LOG.debug("Found a total of {} class files under the \"{}\" package", resources.length, packageName);
         for (Resource resource : resources) {
             MetadataReader reader = metadataReaderFactory.getMetadataReader(resource);
             LOG.trace("Try to load class \"{}\"", reader.getClassMetadata().getClassName());
@@ -142,7 +150,7 @@ public class JobsInitializer implements InitializingBean {
                 LOG.trace("Failed to load class \"{}\"", reader.getClassMetadata().getClassName(), e);
             }
         }
-        LOG.debug("在 [{}] 包下共找到 [{}] 个定时任务并加载成功", packageName, classes.size());
+        LOG.debug("Found a total of {} scheduled tasks under the \"{}}\" package and loaded successfully.", classes.size(), packageName);
         return classes;
     }
 

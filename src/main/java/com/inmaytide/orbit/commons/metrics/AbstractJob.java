@@ -17,26 +17,41 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class AbstractJob implements Job {
 
-    public String getCronExpression() {
-        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getCron();
-    }
-
-    public BigDecimal getFixedTime() {
-        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getFixedTime();
-    }
-
-    public Boolean getActivated() {
-        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getActivated();
-    }
-
-    public Map<String, Object> getOthers() {
-        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getOthers();
-    }
-
     public abstract Logger getLogger();
 
     public abstract String getName();
 
+    /**
+     * 定时任务 cron 表达式
+     */
+    public String getCronExpression() {
+        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getCron();
+    }
+
+    /**
+     * 任务执行间隔时间, 与cron表达式共存时无效
+     */
+    public BigDecimal getFixedTime() {
+        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getFixedTime();
+    }
+
+    /**
+     * 是否激活
+     */
+    public Boolean getActivated() {
+        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getActivated();
+    }
+
+    /**
+     * 定时任务执行需要的其他参数配置
+     */
+    public Map<String, Object> getOthers() {
+        return ApplicationContextHolder.getInstance().getBean(MetricsProperties.class).getJobParam(getName()).getOthers();
+    }
+
+    /**
+     * 服务启动后是否立即执行一次
+     */
     public boolean fireImmediatelyWhenServiceStartup() {
         return false;
     }
