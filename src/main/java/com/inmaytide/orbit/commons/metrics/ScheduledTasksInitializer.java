@@ -104,7 +104,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
             } else {
                 LOG.info("The scheduled task named \"{}[{}]\" already exists", job.getName(), jobClass.getName());
             }
-            if (job.fireImmediatelyWhenServiceStartup()) {
+            if (job.isFireImmediatelyWhenServiceStartup()) {
                 scheduler.triggerJob(scheduler.getTrigger(triggerKey).getJobKey());
             }
         } catch (Exception e) {

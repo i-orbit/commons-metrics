@@ -135,6 +135,8 @@ public class MetricsProperties {
 
         private Boolean activated;
 
+        private Boolean fireImmediatelyWhenServiceStartup;
+
         private Map<String, Object> others;
 
         public String getName() {
@@ -178,6 +180,14 @@ public class MetricsProperties {
 
         public void setOthers(Map<String, Object> others) {
             this.others = others;
+        }
+
+        public Boolean isFireImmediatelyWhenServiceStartup() {
+            return fireImmediatelyWhenServiceStartup != null && fireImmediatelyWhenServiceStartup;
+        }
+
+        public void setFireImmediatelyWhenServiceStartup(Boolean fireImmediatelyWhenServiceStartup) {
+            this.fireImmediatelyWhenServiceStartup = fireImmediatelyWhenServiceStartup;
         }
     }
 
