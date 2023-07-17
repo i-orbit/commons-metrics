@@ -1,11 +1,14 @@
 package com.inmaytide.orbit.commons.metrics.configuration;
 
 import org.quartz.Scheduler;
+import org.quartz.spi.TriggerFiredBundle;
+import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.lang.NonNull;
 import org.springframework.scheduling.quartz.AdaptableJobFactory;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
@@ -15,13 +18,25 @@ import java.util.Properties;
 @Configuration
 @ConditionalOnProperty(name = "metrics.persist", havingValue = "true")
 public class SchedulerConfiguration {
-    private final AdaptableJobFactory adaptableJobFactory;
+    private final AutowireCapableBeanFactory autowireCapableBeanFactory;
 
     private final MetricsProperties properties;
 
-    public SchedulerConfiguration(AdaptableJobFactory adaptableJobFactory, MetricsProperties properties) {
-        this.adaptableJobFactory = adaptableJobFactory;
+    public SchedulerConfiguration(AutowireCapableBeanFactory autowireCapableBeanFactory, MetricsProperties properties) {
+        this.autowireCapableBeanFactory = autowireCapableBeanFactory;
         this.properties = properties;
+    }
+
+    @Bean
+    public AdaptableJobFactory adaptableJobFactory() {
+        return new AdaptableJobFactory() {
+            @Override
+            protected @NonNull Object createJobInstance(@NonNull TriggerFiredBundle bundle) throws Exception {
+                Object instance = super.createJobInstance(bundle);
+                autowireCapableBeanFactory.autowireBean(instance);
+                return instance;
+            }
+        };
     }
 
     @Bean(name = "schedulerFactory")
@@ -43,8 +58,7 @@ public class SchedulerConfiguration {
         // 创建SchedulerFactoryBean
         SchedulerFactoryBean factory = new SchedulerFactoryBean();
         factory.setQuartzProperties(props);
-        factory.setJobFactory(adaptableJobFactory);
-
+        factory.setJobFactory(adaptableJobFactory());
         return factory;
     }
 
