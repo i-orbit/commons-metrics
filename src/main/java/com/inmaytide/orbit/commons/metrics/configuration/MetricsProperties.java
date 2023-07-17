@@ -1,5 +1,7 @@
 package com.inmaytide.orbit.commons.metrics.configuration;
 
+import com.inmaytide.orbit.commons.utils.ApplicationContextHolder;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.math.BigDecimal;
@@ -26,6 +28,9 @@ public class MetricsProperties {
     private List<JobParam> jobParams = new ArrayList<>();
 
     public String getSchedulerInstanceName() {
+        if (StringUtils.isBlank(schedulerInstanceName)) {
+            return ApplicationContextHolder.getInstance().getProperty("spring.application.name") + "SchedulerInstance";
+        }
         return schedulerInstanceName;
     }
 

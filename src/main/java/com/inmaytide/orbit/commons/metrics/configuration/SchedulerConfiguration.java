@@ -3,11 +3,10 @@ package com.inmaytide.orbit.commons.metrics.configuration;
 import org.quartz.Scheduler;
 import org.quartz.spi.TriggerFiredBundle;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.beans.factory.config.PropertiesFactoryBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.support.PropertiesLoaderUtils;
 import org.springframework.lang.NonNull;
 import org.springframework.scheduling.quartz.AdaptableJobFactory;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
@@ -41,19 +40,13 @@ public class SchedulerConfiguration {
 
     @Bean(name = "schedulerFactory")
     public SchedulerFactoryBean schedulerFactoryBean() throws IOException {
-        // 读取 Quartz 配置文件, 并替换数据库列链接相关配置
-        PropertiesFactoryBean propertiesFactoryBean = new PropertiesFactoryBean();
-        propertiesFactoryBean.setLocation(new ClassPathResource("quartz.properties"));
-        Properties props = propertiesFactoryBean.getObject();
-        if (props == null) {
-            throw new IllegalArgumentException();
-        }
+        Properties props = PropertiesLoaderUtils.loadAllProperties("quartz.properties");
         props.put("org.quartz.scheduler.instanceName", properties.getSchedulerInstanceName());
         props.put("org.quartz.dataSource.orbit.driver", properties.getDataSource().getDriver());
         props.put("org.quartz.dataSource.orbit.URL", properties.getDataSource().getURL());
         props.put("org.quartz.dataSource.orbit.user", properties.getDataSource().getUser());
         props.put("org.quartz.dataSource.orbit.password", properties.getDataSource().getPassword());
-        props.put("org.quartz.dataSource.orbit.maxConnections", properties.getDataSource().getMaxConnections());
+        props.put("org.quartz.dataSource.orbit.maxConnections", String.valueOf(properties.getDataSource().getMaxConnections()));
 
         // 创建SchedulerFactoryBean
         SchedulerFactoryBean factory = new SchedulerFactoryBean();
