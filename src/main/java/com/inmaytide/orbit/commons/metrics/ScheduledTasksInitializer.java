@@ -88,7 +88,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
             AbstractJob job = (AbstractJob) jobClass.getDeclaredConstructor().newInstance();
             TriggerKey triggerKey = TriggerKey.triggerKey(job.getName(), TRIGGER_GROUP);
             JobDetail jobDetail = createJobDetail(job);
-            if (!job.getActivated()) {
+            if (!job.isActivated()) {
                 LOG.warn("The scheduled task named \"{}[{}]\" is not active. Initialization is canceled, and any existing execution plans are cleared", job.getName(), jobClass.getName());
                 deleteScheduledTaskIfExist(triggerKey, jobDetail);
                 return;

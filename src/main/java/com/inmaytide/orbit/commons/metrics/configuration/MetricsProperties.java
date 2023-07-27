@@ -4,12 +4,6 @@ import com.inmaytide.orbit.commons.utils.ApplicationContextHolder;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
 /**
  * @author inmaytide
  * @since 2023/5/30
@@ -24,8 +18,6 @@ public class MetricsProperties {
     private DataSource dataSource;
 
     private String jobPackages;
-
-    private List<JobParam> jobParams = new ArrayList<>();
 
     public String getSchedulerInstanceName() {
         if (StringUtils.isBlank(schedulerInstanceName)) {
@@ -60,21 +52,6 @@ public class MetricsProperties {
 
     public void setJobPackages(String jobPackages) {
         this.jobPackages = jobPackages;
-    }
-
-    public List<JobParam> getJobParams() {
-        return jobParams;
-    }
-
-    public void setJobParams(List<JobParam> jobParams) {
-        this.jobParams = jobParams;
-    }
-
-    public JobParam getJobParam(String name) {
-        return getJobParams().stream()
-                .filter(e -> Objects.equals(name, e.getName()))
-                .findFirst()
-                .orElse(new JobParam());
     }
 
     public static class DataSource {
@@ -127,72 +104,6 @@ public class MetricsProperties {
 
         public void setMaxConnections(Integer maxConnections) {
             this.maxConnections = maxConnections;
-        }
-    }
-
-    public static class JobParam {
-
-        private String name;
-
-        private String cron;
-
-        private BigDecimal fixedTime;
-
-        private Boolean activated;
-
-        private Boolean fireImmediatelyWhenServiceStartup;
-
-        private Map<String, Object> others;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public String getCron() {
-            return cron;
-        }
-
-        public void setCron(String cron) {
-            this.cron = cron;
-        }
-
-        public BigDecimal getFixedTime() {
-            return fixedTime;
-        }
-
-        public void setFixedTime(BigDecimal fixedTime) {
-            this.fixedTime = fixedTime;
-        }
-
-        public Boolean getActivated() {
-            if (activated == null) {
-                activated = false;
-            }
-            return activated;
-        }
-
-        public void setActivated(Boolean activated) {
-            this.activated = activated;
-        }
-
-        public Map<String, Object> getOthers() {
-            return others;
-        }
-
-        public void setOthers(Map<String, Object> others) {
-            this.others = others;
-        }
-
-        public Boolean isFireImmediatelyWhenServiceStartup() {
-            return fireImmediatelyWhenServiceStartup != null && fireImmediatelyWhenServiceStartup;
-        }
-
-        public void setFireImmediatelyWhenServiceStartup(Boolean fireImmediatelyWhenServiceStartup) {
-            this.fireImmediatelyWhenServiceStartup = fireImmediatelyWhenServiceStartup;
         }
     }
 
