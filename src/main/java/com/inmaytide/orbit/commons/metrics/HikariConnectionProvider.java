@@ -1,4 +1,4 @@
-package com.inmaytide.orbit.commons.metrics.configuration;
+package com.inmaytide.orbit.commons.metrics;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.quartz.utils.ConnectionProvider;
@@ -7,7 +7,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 /**
- * @author luomiao
+ * @author inmaytide
  * @since 2023/2/27
  */
 public class HikariConnectionProvider implements ConnectionProvider {

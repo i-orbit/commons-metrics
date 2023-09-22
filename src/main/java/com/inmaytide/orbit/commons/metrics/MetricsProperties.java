@@ -1,4 +1,4 @@
-package com.inmaytide.orbit.commons.metrics.configuration;
+package com.inmaytide.orbit.commons.metrics;
 
 import com.inmaytide.orbit.commons.utils.ApplicationContextHolder;
 import org.apache.commons.lang3.StringUtils;

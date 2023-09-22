@@ -1,20 +1,13 @@
 package com.inmaytide.orbit.commons.metrics;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.inmaytide.orbit.commons.metrics.configuration.JobParameter;
-import org.apache.commons.lang3.StringUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.commons.lang3.time.StopWatch;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
-import org.quartz.utils.DBConnectionManager;
 import org.slf4j.Logger;
+import org.springframework.lang.NonNull;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.util.Collections;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,43 +16,12 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class AbstractJob implements Job {
 
-    private static final String SQL_GET_JOB_PARAMETER = "select name, activated, cron, fixed_time, fire_immediately_when_service_startup, others from job_parameter where name = ?";
-
     public abstract Logger getLogger();
 
     public abstract String getName();
 
-    protected JobParameter parameter;
-
-    @SuppressWarnings("unchecked")
-    protected JobParameter getParameters() {
-        if (parameter != null) {
-            return parameter;
-        }
-        JobParameter parameter = new JobParameter(getName());
-        try (Connection connection = DBConnectionManager.getInstance().getConnection("orbit");
-             PreparedStatement statement = connection.prepareStatement(SQL_GET_JOB_PARAMETER)) {
-            statement.setString(1, getName());
-            try (ResultSet rs = statement.executeQuery()) {
-                if (rs.next()) {
-                    parameter.setActivated(rs.getBoolean("activated"));
-                    parameter.setCronExpression(rs.getString("cron"));
-                    parameter.setFixedTime(rs.getBigDecimal("fixed_time"));
-                    parameter.setFireImmediatelyWhenServiceStartup(rs.getBoolean("fire_immediately_when_service_startup"));
-                    String others = rs.getString("others");
-                    if (StringUtils.isNotBlank(others)) {
-                        parameter.setOthers(new ObjectMapper().readValue(others, Map.class));
-                    } else {
-                        parameter.setOthers(Collections.emptyMap());
-                    }
-                } else {
-                    getLogger().error("Parameters for the task named \"{}\" do not exist", getName());
-                }
-            }
-        } catch (Exception e) {
-            getLogger().error("Failed to load parameters for the task named \"{}\", Cause by: ", getName(), e);
-        }
-        return parameter;
+    protected @NonNull JobParameter getParameters() {
+        return JobParametersHolder.get(getName());
     }
 
     /**
@@ -86,7 +48,7 @@ public abstract class AbstractJob implements Job {
     /**
      * 定时任务执行需要的其他参数配置
      */
-    public Map<String, Object> getOthers() {
+    public JsonNode getOthers() {
         return getParameters().getOthers();
     }
 
@@ -97,8 +59,16 @@ public abstract class AbstractJob implements Job {
         return getParameters().isFireImmediatelyWhenServiceStartup();
     }
 
+    public boolean isReinitializeIfExistingAtServiceStartup() {
+        return getParameters().isReinitializeIfExistingAtServiceStartup();
+    }
+
     @Override
     public void execute(JobExecutionContext context) {
+        if (!isActivated()) {
+            getLogger().info("Scheduled task named \"{}\" was inactivated", getName());
+            return;
+        }
         StopWatch stopWatch = StopWatch.createStarted();
         getLogger().info("To start executing a scheduled task named \"{}\"", getName());
         try {

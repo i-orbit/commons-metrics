@@ -1,26 +1,20 @@
 package com.inmaytide.orbit.commons.metrics;
 
-import com.inmaytide.orbit.commons.metrics.configuration.MetricsProperties;
+import com.inmaytide.orbit.commons.utils.CommonUtils;
+import com.inmaytide.orbit.commons.utils.ReflectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
-import org.springframework.core.io.support.ResourcePatternResolver;
-import org.springframework.core.io.support.ResourcePatternUtils;
-import org.springframework.core.type.classreading.CachingMetadataReaderFactory;
-import org.springframework.core.type.classreading.MetadataReader;
-import org.springframework.core.type.classreading.MetadataReaderFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.util.ClassUtils;
 
 import java.io.IOException;
-import java.lang.reflect.Modifier;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Automatic initialization of scheduled tasks based on the relevant configuration.
@@ -40,13 +34,10 @@ public class ScheduledTasksInitializer implements InitializingBean {
 
     private final Scheduler scheduler;
 
-    private final ResourceLoader resourceLoader;
-
     private final String scanPackages;
 
-    public ScheduledTasksInitializer(Scheduler scheduler, ResourceLoader resourceLoader, MetricsProperties env) {
+    public ScheduledTasksInitializer(Scheduler scheduler, MetricsProperties env) {
         this.scheduler = scheduler;
-        this.resourceLoader = resourceLoader;
         this.scanPackages = env.getJobPackages();
     }
 
@@ -83,7 +74,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
         return Optional.empty();
     }
 
-    public void createScheduledTask(Class<?> jobClass) {
+    protected void createScheduledTask(Class<?> jobClass) {
         try {
             AbstractJob job = (AbstractJob) jobClass.getDeclaredConstructor().newInstance();
             TriggerKey triggerKey = TriggerKey.triggerKey(job.getName(), TRIGGER_GROUP);
@@ -92,6 +83,10 @@ public class ScheduledTasksInitializer implements InitializingBean {
                 LOG.warn("The scheduled task named \"{}[{}]\" is not active. Initialization is canceled, and any existing execution plans are cleared", job.getName(), jobClass.getName());
                 deleteScheduledTaskIfExist(triggerKey, jobDetail);
                 return;
+            }
+            if (job.isReinitializeIfExistingAtServiceStartup()) {
+                deleteScheduledTaskIfExist(triggerKey, jobDetail);
+                LOG.info("The scheduled task named \"{}[{}]\"  will be reinitialize", job.getName(), jobClass.getName());
             }
             if (!scheduler.checkExists(triggerKey)) {
                 Optional<ScheduleBuilder<?>> builder = createScheduleBuilder(job);
@@ -117,40 +112,10 @@ public class ScheduledTasksInitializer implements InitializingBean {
             LOG.info("The value of the \"metrics.job-packages\" property is empty, and no scheduled tasks have been initialized");
             return Collections.emptySet();
         }
-        List<String> packages = Pattern.compile(",").splitAsStream(scanPackages)
-                .map(StringUtils::trim)
-                .distinct()
-                .filter(StringUtils::isNotBlank)
-                .toList();
+        List<String> packages = CommonUtils.splitByCommas(scanPackages);
         LOG.info("The value of the \"metrics.job-packages\" property is [{}], there are a total of {} packages that need to be scanned", scanPackages, packages.size());
-        Set<Class<?>> classes = new HashSet<>();
-        for (String packageName : packages) {
-            classes.addAll(getJobClasses(packageName));
-        }
+        Set<Class<?>> classes = ReflectionUtils.findClasses(packages, AbstractJob.class, false);
         LOG.info("A total of {} scheduled tasks need to be initialized", classes.size());
-        return classes;
-    }
-
-    protected List<Class<?>> getJobClasses(String packageName) throws IOException {
-        LOG.debug("Start scanning class files under the \"{}\" package", packageName);
-        List<Class<?>> classes = new ArrayList<>();
-        ResourcePatternResolver resolver = ResourcePatternUtils.getResourcePatternResolver(resourceLoader);
-        MetadataReaderFactory metadataReaderFactory = new CachingMetadataReaderFactory();
-        Resource[] resources = resolver.getResources("classpath*:" + packageName.replaceAll("[.]", "/") + "/**/*.class");
-        LOG.debug("Found a total of {} class files under the \"{}\" package", resources.length, packageName);
-        for (Resource resource : resources) {
-            MetadataReader reader = metadataReaderFactory.getMetadataReader(resource);
-            LOG.trace("Try to load class \"{}\"", reader.getClassMetadata().getClassName());
-            try {
-                Class<?> cls = ClassUtils.forName(reader.getClassMetadata().getClassName(), ClassUtils.getDefaultClassLoader());
-                if (!cls.isInterface() && AbstractJob.class.isAssignableFrom(cls) && !Modifier.isAbstract(cls.getModifiers())) {
-                    classes.add(cls);
-                }
-            } catch (NoClassDefFoundError | ClassNotFoundException | UnsupportedClassVersionError e) {
-                LOG.trace("Failed to load class \"{}\"", reader.getClassMetadata().getClassName(), e);
-            }
-        }
-        LOG.debug("Found a total of {} scheduled tasks under the \"{}}\" package and loaded successfully.", classes.size(), packageName);
         return classes;
     }
 

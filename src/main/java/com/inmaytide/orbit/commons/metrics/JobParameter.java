@@ -1,9 +1,11 @@
-package com.inmaytide.orbit.commons.metrics.configuration;
+package com.inmaytide.orbit.commons.metrics;
+
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigDecimal;
-import java.util.Map;
+import java.time.Instant;
 
 /**
  * @author inmaytide
@@ -40,15 +42,24 @@ public class JobParameter implements Serializable {
     private boolean fireImmediatelyWhenServiceStartup = false;
 
     /**
+     * 在服务启动时，如果已存在则重新初始化
+     */
+    private boolean reinitializeIfExistingAtServiceStartup = false;
+
+    /**
      * 其他任务执行时必要的配置参数
      */
-    private Map<String, Object> others;
+    private JsonNode others;
+
+    private final Instant loadTime;
 
     public JobParameter() {
+        this.loadTime = Instant.now();
     }
 
     public JobParameter(String name) {
         this.name = name;
+        this.loadTime = Instant.now();
     }
 
     public String getName() {
@@ -91,11 +102,24 @@ public class JobParameter implements Serializable {
         this.fireImmediatelyWhenServiceStartup = fireImmediatelyWhenServiceStartup;
     }
 
-    public Map<String, Object> getOthers() {
+    public boolean isReinitializeIfExistingAtServiceStartup() {
+        return reinitializeIfExistingAtServiceStartup;
+    }
+
+    public void setReinitializeIfExistingAtServiceStartup(boolean reinitializeIfExistingAtServiceStartup) {
+        this.reinitializeIfExistingAtServiceStartup = reinitializeIfExistingAtServiceStartup;
+    }
+
+    public JsonNode getOthers() {
         return others;
     }
 
-    public void setOthers(Map<String, Object> others) {
+    public void setOthers(JsonNode others) {
         this.others = others;
     }
+
+    public Instant getLoadTime() {
+        return loadTime;
+    }
+
 }
