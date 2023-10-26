@@ -114,7 +114,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
         }
         List<String> packages = CommonUtils.splitByCommas(scanPackages);
         LOG.info("The value of the \"metrics.job-packages\" property is [{}], there are a total of {} packages that need to be scanned", scanPackages, packages.size());
-        Set<Class<?>> classes = ReflectionUtils.findClasses(packages, AbstractJob.class, false);
+        Set<Class<?>> classes = ReflectionUtils.findClasses(packages, AbstractJob.class, false, false);
         LOG.info("A total of {} scheduled tasks need to be initialized", classes.size());
         return classes;
     }
