@@ -7,6 +7,7 @@ import org.quartz.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +24,7 @@ import java.util.Set;
  * @since 2023/5/30
  */
 @Component
-@DependsOn("applicationContextHolder")
+@DependsOn({"applicationContextHolder"})
 public class ScheduledTasksInitializer implements InitializingBean {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScheduledTasksInitializer.class);
@@ -36,7 +37,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
 
     private final String scanPackages;
 
-    public ScheduledTasksInitializer(Scheduler scheduler, MetricsProperties env) {
+    public ScheduledTasksInitializer(@Qualifier("scheduler") Scheduler scheduler, MetricsProperties env) {
         this.scheduler = scheduler;
         this.scanPackages = env.getJobPackages();
     }

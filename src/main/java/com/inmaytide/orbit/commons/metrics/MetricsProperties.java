@@ -3,11 +3,13 @@ package com.inmaytide.orbit.commons.metrics;
 import com.inmaytide.orbit.commons.utils.ApplicationContextHolder;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 
 /**
  * @author inmaytide
  * @since 2023/5/30
  */
+@Component
 @ConfigurationProperties(prefix = "metrics")
 public class MetricsProperties {
 
