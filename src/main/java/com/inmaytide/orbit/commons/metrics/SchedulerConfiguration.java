@@ -49,6 +49,18 @@ public class SchedulerConfiguration {
             props.put("org.quartz.dataSource.orbit.maxConnections", String.valueOf(properties.getDataSource().getMaxConnections()));
         } else {
             props.put("org.quartz.jobStore.class", org.quartz.simpl.RAMJobStore.class.getName());
+            props.remove("org.quartz.jobStore.tablePrefix");
+            props.remove("org.quartz.jobStore.driverDelegateClass");
+            props.remove("org.quartz.jobStore.dataSource");
+            props.remove("org.quartz.jobStore.useProperties");
+            props.remove("org.quartz.jobStore.isClustered");
+            props.remove("org.quartz.jobStore.maxMisfiresToHandleAtATime");
+            props.remove("org.quartz.dataSource.orbit.connectionProvider.class");
+            props.remove("org.quartz.dataSource.orbit.driver");
+            props.remove("org.quartz.dataSource.orbit.URL");
+            props.remove("org.quartz.dataSource.orbit.user");
+            props.remove("org.quartz.dataSource.orbit.password");
+            props.remove("org.quartz.dataSource.orbit.maxConnections");
         }
 
         // 创建SchedulerFactoryBean
