@@ -53,20 +53,20 @@ public class ScheduledTasksInitializer implements InitializingBean {
         }
     }
 
-    private JobDetail createJobDetail(AbstractJob job) {
+    private JobDetail createJobDetail(JobAdapter job) {
         return JobBuilder.newJob(job.getClass())
                 .withIdentity(job.getName(), JOB_GROUP)
                 .build();
     }
 
-    private Trigger createTrigger(AbstractJob job, ScheduleBuilder<?> scheduleBuilder) {
+    private Trigger createTrigger(JobAdapter job, ScheduleBuilder<?> scheduleBuilder) {
         return TriggerBuilder.newTrigger()
                 .withIdentity(job.getName(), TRIGGER_GROUP)
                 .withSchedule(scheduleBuilder)
                 .startNow().build();
     }
 
-    private Optional<ScheduleBuilder<?>> createScheduleBuilder(AbstractJob job) {
+    private Optional<ScheduleBuilder<?>> createScheduleBuilder(JobAdapter job) {
         if (StringUtils.isNotBlank(job.getCronExpression())) {
             return Optional.of(CronScheduleBuilder.cronSchedule(job.getCronExpression()));
         } else if (job.getFixedTime() != null) {
@@ -77,7 +77,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
 
     protected void createScheduledTask(Class<?> jobClass) {
         try {
-            AbstractJob job = (AbstractJob) jobClass.getDeclaredConstructor().newInstance();
+            JobAdapter job = (JobAdapter) jobClass.getDeclaredConstructor().newInstance();
             TriggerKey triggerKey = TriggerKey.triggerKey(job.getName(), TRIGGER_GROUP);
             JobDetail jobDetail = createJobDetail(job);
             if (!job.isActivated()) {
@@ -115,7 +115,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
         }
         List<String> packages = CommonUtils.splitByCommas(scanPackages);
         LOG.info("The value of the \"metrics.job-packages\" property is [{}], there are a total of {} packages that need to be scanned", scanPackages, packages.size());
-        Set<Class<?>> classes = ReflectionUtils.findClasses(packages, AbstractJob.class, false, false);
+        Set<Class<?>> classes = ReflectionUtils.findClasses(packages, JobAdapter.class, false, false);
         LOG.info("A total of {} scheduled tasks need to be initialized", classes.size());
         return classes;
     }

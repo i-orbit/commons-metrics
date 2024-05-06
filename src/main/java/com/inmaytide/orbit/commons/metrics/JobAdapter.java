@@ -14,57 +14,57 @@ import java.util.concurrent.TimeUnit;
  * @author inmaytide
  * @since 2023/5/30
  */
-public abstract class AbstractJob implements Job {
+public interface JobAdapter extends Job {
 
-    public abstract Logger getLogger();
+    Logger getLogger();
 
-    public abstract String getName();
+    String getName();
 
-    protected @NonNull JobParameter getParameters() {
+    default @NonNull JobParameter getParameters() {
         return JobParametersHolder.get(getName());
     }
 
     /**
      * 定时任务 cron 表达式
      */
-    public String getCronExpression() {
+    default String getCronExpression() {
         return getParameters().getCronExpression();
     }
 
     /**
      * 任务执行间隔时间, 与cron表达式共存时无效
      */
-    public BigDecimal getFixedTime() {
+    default BigDecimal getFixedTime() {
         return getParameters().getFixedTime();
     }
 
     /**
      * 是否激活
      */
-    public boolean isActivated() {
+    default boolean isActivated() {
         return getParameters().isActivated();
     }
 
     /**
      * 定时任务执行需要的其他参数配置
      */
-    public JsonNode getOthers() {
+    default JsonNode getOthers() {
         return getParameters().getOthers();
     }
 
     /**
      * 服务启动后是否立即执行一次
      */
-    public boolean isFireImmediatelyWhenServiceStartup() {
+    default boolean isFireImmediatelyWhenServiceStartup() {
         return getParameters().isFireImmediatelyWhenServiceStartup();
     }
 
-    public boolean isReinitializeIfExistingAtServiceStartup() {
+    default boolean isReinitializeIfExistingAtServiceStartup() {
         return getParameters().isReinitializeIfExistingAtServiceStartup();
     }
 
     @Override
-    public void execute(JobExecutionContext context) {
+    default void execute(JobExecutionContext context) {
         if (!isActivated()) {
             getLogger().info("Scheduled task named \"{}\" was inactivated", getName());
             return;
@@ -81,5 +81,5 @@ public abstract class AbstractJob implements Job {
         }
     }
 
-    protected abstract void exec(JobExecutionContext context);
+    void exec(JobExecutionContext context);
 }
