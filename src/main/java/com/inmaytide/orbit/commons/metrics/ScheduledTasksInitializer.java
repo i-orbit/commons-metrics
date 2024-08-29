@@ -24,7 +24,7 @@ import java.util.Set;
  * @since 2023/5/30
  */
 @Component
-@DependsOn({"applicationContextHolder"})
+@DependsOn({"applicationContextHolder", "jobParametersHolder"})
 public class ScheduledTasksInitializer implements InitializingBean {
 
     private static final Logger LOG = LoggerFactory.getLogger(ScheduledTasksInitializer.class);
@@ -80,7 +80,7 @@ public class ScheduledTasksInitializer implements InitializingBean {
             JobAdapter job = (JobAdapter) jobClass.getDeclaredConstructor().newInstance();
             TriggerKey triggerKey = TriggerKey.triggerKey(job.getName(), TRIGGER_GROUP);
             JobDetail jobDetail = createJobDetail(job);
-            if (!job.isActivated()) {
+            if (job.isDeactivated()) {
                 LOG.warn("The scheduled task named \"{}[{}]\" is not active. Initialization is canceled, and any existing execution plans are cleared", job.getName(), jobClass.getName());
                 deleteScheduledTaskIfExist(triggerKey, jobDetail);
                 return;

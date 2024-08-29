@@ -175,7 +175,7 @@ public class JobParameter implements Serializable {
             return this;
         }
 
-        public Builder inactive() {
+        public Builder deactivate() {
             this.activated = false;
             return this;
         }

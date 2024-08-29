@@ -1,6 +1,7 @@
 package com.inmaytide.orbit.commons.metrics;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.inmaytide.orbit.commons.utils.ApplicationContextHolder;
 import org.apache.commons.lang3.time.StopWatch;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -21,7 +22,7 @@ public interface JobAdapter extends Job {
     String getName();
 
     default @NonNull JobParameter getParameters() {
-        return JobParametersHolder.get(getName());
+        return ApplicationContextHolder.getInstance().getBean(JobParametersHolder.class).get(getName());
     }
 
     /**
@@ -45,6 +46,10 @@ public interface JobAdapter extends Job {
         return getParameters().isActivated();
     }
 
+    default boolean isDeactivated() {
+        return !isActivated();
+    }
+
     /**
      * 定时任务执行需要的其他参数配置
      */
@@ -65,7 +70,7 @@ public interface JobAdapter extends Job {
 
     @Override
     default void execute(JobExecutionContext context) {
-        if (!isActivated()) {
+        if (isDeactivated()) {
             getLogger().info("Scheduled task named \"{}\" was inactivated", getName());
             return;
         }

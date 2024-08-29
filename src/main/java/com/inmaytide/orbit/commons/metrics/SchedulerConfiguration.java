@@ -3,6 +3,7 @@ package com.inmaytide.orbit.commons.metrics;
 import org.quartz.Scheduler;
 import org.quartz.spi.TriggerFiredBundle;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
@@ -22,6 +23,12 @@ public class SchedulerConfiguration {
     public SchedulerConfiguration(AutowireCapableBeanFactory autowireCapableBeanFactory, MetricsProperties properties) {
         this.autowireCapableBeanFactory = autowireCapableBeanFactory;
         this.properties = properties;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(JobParametersHolder.class)
+    public JobParametersHolder jobParametersHolder() {
+        return new DefaultJobParametersHolder();
     }
 
     @Bean
