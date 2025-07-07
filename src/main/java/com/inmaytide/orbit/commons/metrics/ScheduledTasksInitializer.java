@@ -12,13 +12,13 @@ import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
- * Automatic initialization of scheduled tasks based on the relevant configuration.
+ * Initializes and registers all scheduled jobs automatically after Spring Boot starts,
+ * based on the configured job packages.
+ *
+ * <p>It supports automatic deletion/reinitialization and immediate fire behavior.</p>
  *
  * @author inmaytide
  * @since 2023/5/30
@@ -30,11 +30,9 @@ public class ScheduledTasksInitializer implements InitializingBean {
     private static final Logger LOG = LoggerFactory.getLogger(ScheduledTasksInitializer.class);
 
     private static final String JOB_GROUP = "metrics_jobs_group";
-
     private static final String TRIGGER_GROUP = "metrics_triggers_group";
 
     private final Scheduler scheduler;
-
     private final String scanPackages;
 
     public ScheduledTasksInitializer(@Qualifier("scheduler") Scheduler scheduler, MetricsProperties env) {
@@ -44,10 +42,52 @@ public class ScheduledTasksInitializer implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        getJobClasses().forEach(this::createScheduledTask);
+        for (Class<?> jobClass : getJobClasses()) {
+            createScheduledTask(jobClass);
+        }
     }
 
-    private void deleteScheduledTaskIfExist(TriggerKey triggerKey, JobDetail jobDetail) throws SchedulerException {
+    private void createScheduledTask(Class<?> jobClass) {
+        try {
+            JobAdapter job = (JobAdapter) jobClass.getDeclaredConstructor().newInstance();
+            String jobName = job.getName();
+            TriggerKey triggerKey = TriggerKey.triggerKey(jobName, TRIGGER_GROUP);
+            JobDetail jobDetail = createJobDetail(job);
+
+            if (job.isDeactivated()) {
+                LOG.warn("Task [{}] is deactivated. Skipping initialization and deleting any existing job.", jobName);
+                deleteScheduledTaskIfExists(triggerKey, jobDetail);
+                return;
+            }
+
+            if (job.isReinitializeIfExistsOnServiceStartup()) {
+                LOG.info("Task [{}] is configured to reinitialize on startup. Deleting any existing job.", jobName);
+                deleteScheduledTaskIfExists(triggerKey, jobDetail);
+            }
+
+            if (!scheduler.checkExists(triggerKey)) {
+                Optional<ScheduleBuilder<?>> builder = createScheduleBuilder(job);
+                if (builder.isEmpty()) {
+                    LOG.error("Task [{}] initialization failed. Missing or invalid 'cron' and 'fixed-time' configuration.", jobName);
+                    return;
+                }
+                scheduler.scheduleJob(jobDetail, createTrigger(job, builder.get()));
+                LOG.info("Task [{}] initialized successfully.", jobName);
+            } else {
+                LOG.info("Task [{}] already exists. Skipping registration.", jobName);
+            }
+
+            if (job.isFireOnceOnServiceStartup()) {
+                scheduler.triggerJob(jobDetail.getKey());
+                LOG.info("Task [{}] triggered immediately after service startup.", jobName);
+            }
+
+        } catch (Exception e) {
+            LOG.error("Failed to initialize task [{}]. Cause: {}", jobClass.getName(), e.getMessage(), e);
+        }
+    }
+
+    private void deleteScheduledTaskIfExists(TriggerKey triggerKey, JobDetail jobDetail) throws SchedulerException {
         if (scheduler.checkExists(triggerKey)) {
             scheduler.deleteJob(jobDetail.getKey());
         }
@@ -63,61 +103,28 @@ public class ScheduledTasksInitializer implements InitializingBean {
         return TriggerBuilder.newTrigger()
                 .withIdentity(job.getName(), TRIGGER_GROUP)
                 .withSchedule(scheduleBuilder)
-                .startNow().build();
+                .startNow()
+                .build();
     }
 
     private Optional<ScheduleBuilder<?>> createScheduleBuilder(JobAdapter job) {
         if (StringUtils.isNotBlank(job.getCronExpression())) {
             return Optional.of(CronScheduleBuilder.cronSchedule(job.getCronExpression()));
-        } else if (job.getFixedTime() != null) {
+        } else if (job.getFixedTime() != null && job.getFixedTime().intValue() > 0) {
             return Optional.of(SimpleScheduleBuilder.repeatSecondlyForever(job.getFixedTime().intValue()));
         }
         return Optional.empty();
     }
 
-    protected void createScheduledTask(Class<?> jobClass) {
-        try {
-            JobAdapter job = (JobAdapter) jobClass.getDeclaredConstructor().newInstance();
-            TriggerKey triggerKey = TriggerKey.triggerKey(job.getName(), TRIGGER_GROUP);
-            JobDetail jobDetail = createJobDetail(job);
-            if (job.isDeactivated()) {
-                LOG.warn("The scheduled task named \"{}[{}]\" is not active. Initialization is canceled, and any existing execution plans are cleared", job.getName(), jobClass.getName());
-                deleteScheduledTaskIfExist(triggerKey, jobDetail);
-                return;
-            }
-            if (job.isReinitializeIfExistingAtServiceStartup()) {
-                deleteScheduledTaskIfExist(triggerKey, jobDetail);
-                LOG.info("The scheduled task named \"{}[{}]\"  will be reinitialize", job.getName(), jobClass.getName());
-            }
-            if (!scheduler.checkExists(triggerKey)) {
-                Optional<ScheduleBuilder<?>> builder = createScheduleBuilder(job);
-                if (builder.isEmpty()) {
-                    LOG.error("The scheduled task named \"{}[{}]\" failed to initialize. \"cron\" and \"fixed-time\" were not configured with valid values", job.getName(), jobClass.getName());
-                    return;
-                }
-                scheduler.scheduleJob(jobDetail, createTrigger(job, builder.get()));
-                LOG.info("The scheduled task named \"{}[{}]\" was initialized successfully", job.getName(), jobClass.getName());
-            } else {
-                LOG.info("The scheduled task named \"{}[{}]\" already exists", job.getName(), jobClass.getName());
-            }
-            if (job.isFireImmediatelyWhenServiceStartup()) {
-                scheduler.triggerJob(scheduler.getTrigger(triggerKey).getJobKey());
-            }
-        } catch (Exception e) {
-            LOG.error("The scheduled task \"{}\" failed to initialize, Cause by: ", jobClass.getName(), e);
-        }
-    }
-
     protected Set<Class<?>> getJobClasses() throws IOException {
         if (StringUtils.isBlank(scanPackages)) {
-            LOG.info("The value of the \"metrics.job-packages\" property is empty, and no scheduled tasks have been initialized");
+            LOG.warn("No job packages configured via 'metrics.job-packages'. Skipping job scan.");
             return Collections.emptySet();
         }
         List<String> packages = CommonUtils.splitByCommas(scanPackages);
-        LOG.info("The value of the \"metrics.job-packages\" property is [{}], there are a total of {} packages that need to be scanned", scanPackages, packages.size());
-        Set<Class<?>> classes = ReflectionUtils.findClasses(packages, JobAdapter.class, false, false);
-        LOG.info("A total of {} scheduled tasks need to be initialized", classes.size());
-        return classes;
+        LOG.info("Scanning {} package(s) from config: [{}]", packages.size(), scanPackages);
+        Set<Class<?>> jobClasses = ReflectionUtils.findClasses(packages, JobAdapter.class, false, false);
+        LOG.info("Found {} scheduled task(s) to initialize.", jobClasses.size());
+        return jobClasses;
     }
-
 }

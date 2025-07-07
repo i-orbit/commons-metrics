@@ -2,6 +2,7 @@ package com.inmaytide.orbit.commons.metrics;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.inmaytide.orbit.Version;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serial;
@@ -18,58 +19,60 @@ import java.util.Map;
 public class JobParameter implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = -5778856660833466483L;
+    private static final long serialVersionUID = Version.SERIAL_VERSION_UID;
 
     /**
-     * 任务名称, 与 AbstractJob 中的 name 属性对应
+     * Job name (must match AbstractJob.name)
      */
     private String name;
 
     /**
-     * 任务是否激活，参数加载失败时为 false
+     * Whether this job is enabled
      */
     private boolean activated = false;
 
     /**
-     * cron 表达式, 与 fixedTime 同时有值, cron有效
+     * Cron expression. Takes precedence over fixedTime if both present.
      */
     private String cronExpression;
 
     /**
-     * 每 n 分钟执行一次, 与 cronExpression 同时有值时无效
+     * Fixed interval (in minutes) to execute. Ignored if cronExpression is set.
      */
     private BigDecimal fixedTime;
 
     /**
-     * 是否在服务启动后执行一次
+     * Whether to run once when the service starts
      */
-    private boolean fireImmediatelyWhenServiceStartup = false;
+    private boolean fireOnceOnServiceStartup;
 
     /**
-     * 在服务启动时，如果已存在则重新初始化
+     * If job exists on service start, whether to reinitialize it
      */
-    private boolean reinitializeIfExistingAtServiceStartup = false;
+    private boolean reinitializeIfExistsOnServiceStartup;
 
     /**
-     * 其他任务执行时必要的配置参数
+     * Additional parameters for job logic
      */
     private JsonNode others;
 
-    private final Instant loadTime;
+    /**
+     * Load time of the configuration
+     */
+    private final Instant loadTime = Instant.now();
 
+
+    // Constructors
     public JobParameter() {
-        this.loadTime = Instant.now();
     }
 
     public JobParameter(String name) {
         this.name = name;
-        this.loadTime = Instant.now();
     }
 
+    // Builder
     public static Builder withName(String name) {
-        Builder builder = new Builder();
-        builder.name = name;
-        return builder;
+        return new Builder().name(name);
     }
 
     public String getName() {
@@ -104,20 +107,20 @@ public class JobParameter implements Serializable {
         this.activated = activated;
     }
 
-    public boolean isFireImmediatelyWhenServiceStartup() {
-        return fireImmediatelyWhenServiceStartup;
+    public boolean isFireOnceOnServiceStartup() {
+        return fireOnceOnServiceStartup;
     }
 
-    public void setFireImmediatelyWhenServiceStartup(boolean fireImmediatelyWhenServiceStartup) {
-        this.fireImmediatelyWhenServiceStartup = fireImmediatelyWhenServiceStartup;
+    public void setFireOnceOnServiceStartup(boolean fireOnceOnServiceStartup) {
+        this.fireOnceOnServiceStartup = fireOnceOnServiceStartup;
     }
 
-    public boolean isReinitializeIfExistingAtServiceStartup() {
-        return reinitializeIfExistingAtServiceStartup;
+    public boolean isReinitializeIfExistsOnServiceStartup() {
+        return reinitializeIfExistsOnServiceStartup;
     }
 
-    public void setReinitializeIfExistingAtServiceStartup(boolean reinitializeIfExistingAtServiceStartup) {
-        this.reinitializeIfExistingAtServiceStartup = reinitializeIfExistingAtServiceStartup;
+    public void setReinitializeIfExistsOnServiceStartup(boolean reinitializeIfExistsOnServiceStartup) {
+        this.reinitializeIfExistsOnServiceStartup = reinitializeIfExistsOnServiceStartup;
     }
 
     public JsonNode getOthers() {
@@ -134,41 +137,20 @@ public class JobParameter implements Serializable {
 
 
     public static class Builder {
-
-        /**
-         * 任务名称, 与 AbstractJob 中的 name 属性对应
-         */
         private String name;
-
-        /**
-         * 任务是否激活，参数加载失败时为 false
-         */
         private boolean activated = false;
-
-        /**
-         * cron 表达式, 与 fixedTime 同时有值, cron有效
-         */
         private String cronExpression;
-
-        /**
-         * 每 n 分钟执行一次, 与 cronExpression 同时有值时无效
-         */
         private BigDecimal fixedTime;
-
-        /**
-         * 是否在服务启动后执行一次
-         */
-        private boolean fireImmediatelyWhenServiceStartup = false;
-
-        /**
-         * 在服务启动时，如果已存在则重新初始化
-         */
-        private boolean reinitializeIfExistingAtServiceStartup = false;
-
-        /**
-         * 其他任务执行时必要的配置参数
-         */
+        private boolean fireOnceOnServiceStartup = false;
+        private boolean reinitializeIfExistsOnServiceStartup = false;
         private final Map<String, Object> others = new HashMap<>();
+
+        private static final ObjectMapper MAPPER = new ObjectMapper();
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
 
         public Builder active() {
             this.activated = true;
@@ -177,6 +159,11 @@ public class JobParameter implements Serializable {
 
         public Builder deactivate() {
             this.activated = false;
+            return this;
+        }
+
+        public Builder activated(Boolean activated) {
+            this.activated = activated != null && activated;
             return this;
         }
 
@@ -190,13 +177,13 @@ public class JobParameter implements Serializable {
             return this;
         }
 
-        public Builder fireImmediatelyWhenServiceStartup() {
-            this.fireImmediatelyWhenServiceStartup = true;
+        public Builder fireOnceOnServiceStartup(boolean value) {
+            this.fireOnceOnServiceStartup = value;
             return this;
         }
 
-        public Builder reinitializeIfExistingAtServiceStartup() {
-            this.reinitializeIfExistingAtServiceStartup = true;
+        public Builder reinitializeIfExistsOnServiceStartup(boolean value) {
+            this.reinitializeIfExistsOnServiceStartup = value;
             return this;
         }
 
@@ -205,25 +192,37 @@ public class JobParameter implements Serializable {
             return this;
         }
 
-        public JobParameter build() {
-            if (StringUtils.isBlank(name)) {
-                throw new IllegalArgumentException("JobParameter name is required");
+        public Builder others(String json) {
+            if (StringUtils.isBlank(json)) {
+                return this;
             }
-            if (StringUtils.isBlank(cronExpression) && (fixedTime == null || fixedTime.doubleValue() <= 0)) {
-                throw new IllegalArgumentException("JobParameter cron expression or fixed time is required");
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = MAPPER.readValue(json, HashMap.class);
+                this.others.putAll(parsed);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Failed to parse JSON string to others", e);
             }
-
-            JobParameter parameter = new JobParameter();
-            parameter.setName(name);
-            parameter.setActivated(activated);
-            parameter.setCronExpression(cronExpression);
-            parameter.setFixedTime(fixedTime);
-            parameter.setReinitializeIfExistingAtServiceStartup(reinitializeIfExistingAtServiceStartup);
-            parameter.setFireImmediatelyWhenServiceStartup(fireImmediatelyWhenServiceStartup);
-            parameter.setOthers(new ObjectMapper().valueToTree(this.others));
-            return parameter;
+            return this;
         }
 
+        public JobParameter build() {
+            if (StringUtils.isBlank(name)) {
+                throw new IllegalArgumentException("JobParameter 'name' must not be blank.");
+            }
+            if (StringUtils.isBlank(cronExpression) && (fixedTime == null || fixedTime.doubleValue() <= 0)) {
+                throw new IllegalArgumentException("Either 'cronExpression' or a valid 'fixedTime' must be provided.");
+            }
+
+            JobParameter param = new JobParameter(name);
+            param.setActivated(activated);
+            param.setCronExpression(cronExpression);
+            param.setFixedTime(fixedTime);
+            param.setFireOnceOnServiceStartup(fireOnceOnServiceStartup);
+            param.setReinitializeIfExistsOnServiceStartup(reinitializeIfExistsOnServiceStartup);
+            param.setOthers(MAPPER.valueToTree(this.others));
+            return param;
+        }
     }
 
 }
